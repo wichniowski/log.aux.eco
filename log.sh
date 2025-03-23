@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Create .aux/log directory in home directory if it doesn't exist
-mkdir -p "$HOME/.aux/log"
+# Use LOG_AUX_FOLDER_PATH if set, otherwise use default path
+LOG_DIR="${LOG_AUX_FOLDER_PATH:-$HOME/.aux/log}"
+
+# Create log directory if it doesn't exist
+mkdir -p "$LOG_DIR"
 
 # Function to handle commands
 handle_command() {
@@ -9,7 +12,7 @@ handle_command() {
     case "$command" in
         "today"|"day")
             current_date=$(date '+%m-%Y-%d')
-            log_file="$HOME/.aux/log/log-${current_date}.md"
+            log_file="$LOG_DIR/log-${current_date}.md"
             if [ -f "$log_file" ]; then
                 cat "$log_file"
             else
@@ -18,16 +21,33 @@ handle_command() {
             ;;
         "yesterday")
             yesterday_date=$(date -d "yesterday" '+%m-%Y-%d')
-            log_file="$HOME/.aux/log/log-${yesterday_date}.md"
+            log_file="$LOG_DIR/log-${yesterday_date}.md"
             if [ -f "$log_file" ]; then
                 cat "$log_file"
             else
                 echo "No log file exists for yesterday"
             fi
             ;;
+        "summary")
+            current_date=$(date '+%m-%Y-%d')
+            log_file="$LOG_DIR/log-${current_date}.md"
+            if [ -f "$log_file" ]; then
+                log_content=$(cat "$log_file")
+                echo "Generating summary of today's log..."
+                summary=$(ollama run mistral "Summarize the following log entries in bullet points: $log_content")
+                echo -e "\nSummary of today's log:"
+                echo "$summary"
+                
+                # Append the summary to the log file
+                echo -e "\n## Summary at $(date '+%Y-%m-%d %H:%M:%S')\n**Summary:**\n$summary" >> "$log_file"
+                echo "Summary has been added to $log_file"
+            else
+                echo "No log file exists for today"
+            fi
+            ;;
         "tasks")
             current_date=$(date '+%m-%Y-%d')
-            log_file="$HOME/.aux/log/log-${current_date}.md"
+            log_file="$LOG_DIR/log-${current_date}.md"
             if [ -f "$log_file" ]; then
                 log_content=$(cat "$log_file")
                 echo "Analyzing today's log for tasks..."
@@ -44,6 +64,7 @@ handle_command() {
             echo "  today/day     - Display today's log entries"
             echo "  yesterday     - Display yesterday's log entries"
             echo "  tasks         - Extract and list tasks from today's log"
+            echo "  summary       - Generate a summary of today's log"
             echo "  [any text]    - Create a new log entry with the text"
             ;;
         *)
@@ -73,12 +94,9 @@ fi
 
 # Process log entry
 date_format=$(date '+%m-%Y-%d')
-filename="$HOME/.aux/log/log-${date_format}.md"
-
-# Call ollama with mistral model to summarize the input
-summary=$(ollama run mistral "Summarize the following text: $user_input")
+filename="$LOG_DIR/log-${date_format}.md"
 
 # Create or append to the log file
-echo -e "\n--- Entry at $(date '+%Y-%m-%d %H:%M:%S') ---\nOriginal: $user_input\nSummary: $summary" >> "$filename"
+echo -e "\n## Entry at $(date '+%Y-%m-%d %H:%M:%S')\n$user_input" >> "$filename"
 
 echo "Log entry has been saved to $filename" 
